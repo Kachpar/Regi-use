@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flat Contact Form</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
+    }
+    html, body {
+      height: 100vh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+    body {
+      background: linear-gradient(135deg, #ffeb00 50%, #a259ff 50%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      padding: 20px;
+      position: relative;
+    }
+    .corner-circle {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background-color: #6b4eff;
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .top-right {
+      top: -50px;
+      right: -50px;
+    }
+    .bottom-left {
+      bottom: -50px;
+      left: -50px;
+    }
+    .form-content {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #000;
+    }
+    p {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 5px;
+      border: 2px solid #999;
+      border-radius: 10px;
+      outline: none;
+      background-color: #f4f4f4;
+    }
+    input:focus, select:focus {
+      background-color: #d6ffd6;
+      border-color: #00c851;
+    }
+    .error {
+      border-color: red;
+    }
+    .error-message {
+      font-size: 12px;
+      color: red;
+      margin-bottom: 10px;
+      display: none;
+    }
+    .error-visible {
+      display: block;
+    }
+    .phone-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 5px;
+    }
+    .phone-row select {
+      width: 30%;
+      text-align: center;
+    }
+    .phone-row input {
+      width: 70%;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #2d2d2d;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+      visibility: hidden;
+    }
+    button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      font-size: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #ffffff;
+      color: #000000;
+      padding: 10px 16px;
+      border-radius: 25px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+    }
+  </style>
+
+  <!-- EmailJS SDK (Fixed version) -->
+  <script type="module">
+    import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js';
+    emailjs.init("Mk4dJzDHZkTGjDCT6");
+    window.emailjs = emailjs;
+  </script>
+</head>
+<body>
+  <div class="corner-circle top-right"></div>
+  <div class="corner-circle bottom-left"></div>
+
+  <div class="form-content">
+    <h2>Create Your Account</h2>
+    <p>Enter Details</p>
+    <form id="contactForm">
+      <input type="text" id="name" placeholder="Name"/>
+      <div class="error-message" id="nameError">Name must be at least 2 characters.</div>
+
+      <input type="email" id="email" placeholder="Email"/>
+      <div class="error-message" id="emailError">Enter a valid email address.</div>
+
+      <div class="phone-row">
+        <select id="countryCode">
+          <option value="+91" selected>+91</option>
+          <option value="+44">+44</option>
+          <option value="+1">+1</option>
+        </select>
+        <input type="text" id="phone" placeholder="Phone" maxlength="11"/>
+      </div>
+      <div class="error-message" id="phoneError">Enter a valid 10-digit phone number.</div>
+
+      <button type="submit" id="submitBtn" disabled>Submit</button>
+    </form>
+  </div>
+
+  <div id="toast" class="toast">Form submitted successfully!</div>
+
+  <script>
+    const nameInput = document.getElementById("name");
+    const emailInput = document.getElementById("email");
+    const phoneInput = document.getElementById("phone");
+    const countryCode = document.getElementById("countryCode");
+    const form = document.getElementById("contactForm");
+    const submitBtn = document.getElementById("submitBtn");
+
+    function toggleError(field, showError) {
+      const input = document.getElementById(field);
+      const error = document.getElementById(field + "Error");
+      if (showError) {
+        input.classList.add("error");
+        error.classList.add("error-visible");
+      } else {
+        input.classList.remove("error");
+        error.classList.remove("error-visible");
+      }
+    }
+
+    phoneInput.addEventListener("input", () => {
+      let raw = phoneInput.value.replace(/\D/g, "");
+      if (raw.length > 10) raw = raw.slice(0, 10);
+      if (raw.length > 5) {
+        phoneInput.value = raw.slice(0, 5) + " " + raw.slice(5);
+      } else {
+        phoneInput.value = raw;
+      }
+      validateForm();
+    });
+
+    nameInput.addEventListener("input", validateForm);
+    emailInput.addEventListener("input", validateForm);
+
+    nameInput.addEventListener("blur", () => {
+      if (nameInput.value.trim() !== "") {
+        toggleError("name", nameInput.value.trim().length < 2);
+      }
+    });
+
+    emailInput.addEventListener("blur", () => {
+      if (emailInput.value.trim() !== "") {
+        const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
+        toggleError("email", !valid);
+      }
+    });
+
+    phoneInput.addEventListener("blur", () => {
+      const val = phoneInput.value.replace(/\D/g, "");
+      if (val !== "") {
+        toggleError("phone", val.length !== 10);
+      }
+    });
+
+    function validateForm() {
+      const nameVal = nameInput.value.trim();
+      const emailVal = emailInput.value.trim();
+      const phoneVal = phoneInput.value.replace(/\D/g, "");
+
+      const nameValid = nameVal.length >= 2;
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+      const phoneValid = phoneVal.length === 10;
+
+      if (nameVal || emailVal || phoneVal) {
+        submitBtn.style.visibility = "visible";
+      } else {
+        submitBtn.style.visibility = "hidden";
+      }
+
+      submitBtn.disabled = !(nameValid && emailValid && phoneValid);
+    }
+
+    form.addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const nameVal = nameInput.value.trim();
+      const emailVal = emailInput.value.trim();
+      const phoneVal = phoneInput.value.replace(/\D/g, "");
+      const codeVal = countryCode.value;
+
+      const nameValid = nameVal.length >= 2;
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal);
+      const phoneValid = phoneVal.length === 10;
+
+      toggleError("name", !nameValid);
+      toggleError("email", !emailValid);
+      toggleError("phone", !phoneValid);
+
+      if (nameValid && emailValid && phoneValid) {
+        const templateParams = {
+          name: nameVal,
+          email: emailVal,
+          phone: codeVal + " " + phoneVal,
+          message: "New form submission"
+        };
+
+        window.emailjs.send("Parth", "template_6p6xz3i", templateParams)
+          .then(function(response) {
+            const toast = document.getElementById("toast");
+            toast.classList.add("show");
+            setTimeout(() => {
+              toast.classList.remove("show");
+            }, 2000);
+            form.reset();
+            submitBtn.disabled = true;
+            submitBtn.style.visibility = "hidden";
+            document.querySelectorAll(".error").forEach(el => el.classList.remove("error"));
+            document.querySelectorAll(".error-message").forEach(el => el.classList.remove("error-visible"));
+          }, function(error) {
+            alert("Form submit failed: " + error.text);
+          });
+      }
+    });
+  </script>
+</body>
+</html>
